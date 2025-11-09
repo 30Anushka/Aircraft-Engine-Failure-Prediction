@@ -5,37 +5,18 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.express as px
-import pickle
-import time
-from datetime import datetime
-import os
-# top of dashboard.py (replace your current imports)
-import streamlit as st
-import pandas as pd
-import numpy as np
 import pickle, os, time
 from datetime import datetime
 
-# Try plotly first, fallback to matplotlib
+# --------------------------------------------
+# 0. Safe Import: Try Plotly first, fallback to Matplotlib
+# --------------------------------------------
 try:
     import plotly.express as px
     PLOTLY_AVAILABLE = True
-except Exception as e:
-    PLOTLY_AVAILABLE = False
+except ModuleNotFoundError:
     import matplotlib.pyplot as plt
-
-# later, when plotting:
-if PLOTLY_AVAILABLE:
-    fig = px.line(batch, x="cycle", y=feature_cols[:3], title="Sensor Health Trends")
-    col1.plotly_chart(fig, use_container_width=True)
-else:
-    fig, ax = plt.subplots()
-    for col in feature_cols[:3]:
-        ax.plot(batch['cycle'], batch[col], label=col)
-    ax.legend()
-    ax.set_xlabel("cycle"); ax.set_ylabel("sensor")
-    col1.pyplot(fig)
+    PLOTLY_AVAILABLE = False
 
 # --------------------------------------------
 # 1. Page Configuration
@@ -48,6 +29,8 @@ st.set_page_config(
 st.title("🛠️ Aircraft Engine Remaining Useful Life (RUL) Prediction")
 st.markdown("#### Real-Time Predictive Maintenance Dashboard")
 
+st.sidebar.write(f"📊 Plotly Available: {'✅ Using Plotly' if PLOTLY_AVAILABLE else '❌ Using Matplotlib fallback'}")
+
 # --------------------------------------------
 # 2. Load Model (cached for speed)
 # --------------------------------------------
@@ -55,7 +38,7 @@ st.markdown("#### Real-Time Predictive Maintenance Dashboard")
 def load_model():
     model_path = "models/rf_model.pkl"
     if not os.path.exists(model_path):
-        st.error("❌ Model file not found. Please ensure 'models/rf_model.pkl' is uploaded.")
+        st.error("❌ Model file not found. Please ensure 'models/rf_model.pkl' is uploaded to the repository.")
         st.stop()
     with open(model_path, "rb") as f:
         model = pickle.load(f)
@@ -84,10 +67,17 @@ if uploaded_file is not None:
 else:
     sample_path = "data/sample_engine.csv"
     if not os.path.exists(sample_path):
-        st.error("❌ Sample file not found in 'data/sample_engine.csv'. Please upload a file to proceed.")
-        st.stop()
-    st.warning("⚠️ No file uploaded — using sample simulation data.")
-    df = pd.read_csv(sample_path)
+        st.warning("⚠️ No uploaded data or sample data found. Switching to Demo Mode.")
+        # Demo Mode: generate synthetic data
+        df = pd.DataFrame({
+            "cycle": np.arange(1, 51),
+            "sensor_1": np.linspace(100, 60, 50) + np.random.randn(50),
+            "sensor_2": np.linspace(200, 130, 50) + np.random.randn(50),
+            "sensor_3": np.linspace(80, 50, 50) + np.random.randn(50)
+        })
+    else:
+        st.warning("⚠️ No file uploaded — using sample simulation data.")
+        df = pd.read_csv(sample_path)
 
 # --------------------------------------------
 # 5. Feature Selection & Prediction
@@ -127,27 +117,46 @@ for i in range(0, len(df), steps):
         else:
             col2.success("✅ Engine operating within safe RUL range.")
 
-        # --- Plot Sensor Trend
-        fig = px.line(
-            batch,
-            x="cycle",
-            y=feature_cols[:3],
-            title="Sensor Health Trends (first 3 sensors)",
-            labels={"value": "Sensor Reading", "cycle": "Cycle"}
-        )
-        fig.update_layout(margin=dict(l=40, r=40, t=40, b=40))
-        col1.plotly_chart(fig, use_container_width=True)
+        # --- Plot Sensor Trends
+        if PLOTLY_AVAILABLE:
+            fig = px.line(
+                batch,
+                x="cycle",
+                y=feature_cols[:3],
+                title="Sensor Health Trends (first 3 sensors)",
+                labels={"value": "Sensor Reading", "cycle": "Cycle"}
+            )
+            fig.update_layout(margin=dict(l=40, r=40, t=40, b=40))
+            col1.plotly_chart(fig, use_container_width=True)
+        else:
+            fig, ax = plt.subplots()
+            for col in feature_cols[:3]:
+                ax.plot(batch["cycle"], batch[col], label=col)
+            ax.legend()
+            ax.set_title("Sensor Health Trends (first 3 sensors)")
+            ax.set_xlabel("Cycle")
+            ax.set_ylabel("Sensor Reading")
+            col1.pyplot(fig)
 
-        # --- Plot RUL over time
-        fig2 = px.line(
-            batch,
-            x="cycle",
-            y="Predicted_RUL",
-            title="Predicted Remaining Useful Life Over Time",
-            labels={"Predicted_RUL": "RUL (cycles)"}
-        )
-        fig2.update_layout(margin=dict(l=40, r=40, t=40, b=40))
-        col1.plotly_chart(fig2, use_container_width=True)
+        # --- Plot Predicted RUL
+        if PLOTLY_AVAILABLE:
+            fig2 = px.line(
+                batch,
+                x="cycle",
+                y="Predicted_RUL",
+                title="Predicted Remaining Useful Life Over Time",
+                labels={"Predicted_RUL": "RUL (cycles)"}
+            )
+            fig2.update_layout(margin=dict(l=40, r=40, t=40, b=40))
+            col1.plotly_chart(fig2, use_container_width=True)
+        else:
+            fig2, ax2 = plt.subplots()
+            ax2.plot(batch["cycle"], batch["Predicted_RUL"], color="orange", label="Predicted RUL")
+            ax2.legend()
+            ax2.set_title("Predicted Remaining Useful Life Over Time")
+            ax2.set_xlabel("Cycle")
+            ax2.set_ylabel("RUL (cycles)")
+            col1.pyplot(fig2)
 
     time.sleep(refresh_rate)
 
