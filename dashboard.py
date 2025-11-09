@@ -10,6 +10,25 @@ import pickle
 import time
 from datetime import datetime
 
+
+
+import os
+import subprocess
+import sys
+
+# Auto-install missing dependencies (like Plotly)
+required = ['plotly']
+for pkg in required:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", pkg])
+
+import plotly.express as px
+import streamlit as st
+import pandas as pd
+import numpy as np
+import pickle
+import time
+
+
 # --------------------------------------------
 # 1. Page Configuration
 # --------------------------------------------
@@ -100,3 +119,4 @@ for i in range(0, len(df), 10):  # show 10 new cycles at a time
         col1.plotly_chart(fig2, use_container_width=True)
 
     time.sleep(refresh_rate)
+
