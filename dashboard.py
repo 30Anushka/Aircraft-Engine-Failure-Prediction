@@ -10,6 +10,32 @@ import pickle
 import time
 from datetime import datetime
 import os
+# top of dashboard.py (replace your current imports)
+import streamlit as st
+import pandas as pd
+import numpy as np
+import pickle, os, time
+from datetime import datetime
+
+# Try plotly first, fallback to matplotlib
+try:
+    import plotly.express as px
+    PLOTLY_AVAILABLE = True
+except Exception as e:
+    PLOTLY_AVAILABLE = False
+    import matplotlib.pyplot as plt
+
+# later, when plotting:
+if PLOTLY_AVAILABLE:
+    fig = px.line(batch, x="cycle", y=feature_cols[:3], title="Sensor Health Trends")
+    col1.plotly_chart(fig, use_container_width=True)
+else:
+    fig, ax = plt.subplots()
+    for col in feature_cols[:3]:
+        ax.plot(batch['cycle'], batch[col], label=col)
+    ax.legend()
+    ax.set_xlabel("cycle"); ax.set_ylabel("sensor")
+    col1.pyplot(fig)
 
 # --------------------------------------------
 # 1. Page Configuration
