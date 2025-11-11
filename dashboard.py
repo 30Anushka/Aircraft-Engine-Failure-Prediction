@@ -5,11 +5,11 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import pickle, os, time
+import os, time, gzip, pickle, joblib
 from datetime import datetime
 
 # --------------------------------------------
-# 0. Safe Import: Try Plotly first, fallback to Matplotlib
+# Safe Import: Try Plotly first, fallback to Matplotlib
 # --------------------------------------------
 try:
     import plotly.express as px
@@ -28,21 +28,34 @@ st.set_page_config(
 )
 st.title("🛠️ Aircraft Engine Remaining Useful Life (RUL) Prediction")
 st.markdown("#### Real-Time Predictive Maintenance Dashboard")
-
 st.sidebar.write(f"📊 Plotly Available: {'✅ Using Plotly' if PLOTLY_AVAILABLE else '❌ Using Matplotlib fallback'}")
 
 # --------------------------------------------
-# 2. Load Model (cached for speed)
+# 2. Load Model (Auto-detect compressed or uncompressed)
 # --------------------------------------------
 @st.cache_resource(show_spinner=True)
 def load_model():
-    model_path = "models/rf_model.pkl"
+    model_path = "models/rf_model.pkl"  # Change if using .gz file
+
     if not os.path.exists(model_path):
         st.error("❌ Model file not found. Please ensure 'models/rf_model.pkl' is uploaded to the repository.")
         st.stop()
-    with open(model_path, "rb") as f:
-        model = pickle.load(f)
-    return model
+
+    try:
+        # Try joblib (works for both normal and compressed .pkl)
+        model = joblib.load(model_path)
+        st.success("✅ Model loaded successfully using joblib!")
+        return model
+    except Exception as e1:
+        try:
+            # Try gzip + pickle (for .gz compressed models)
+            with gzip.open(model_path, "rb") as f:
+                model = pickle.load(f)
+            st.success("✅ Model loaded successfully using gzip + pickle!")
+            return model
+        except Exception as e2:
+            st.error(f"⚠️ Model load failed.\nJoblib error: {e1}\nGzip error: {e2}")
+            st.stop()
 
 model = load_model()
 
@@ -67,7 +80,7 @@ if uploaded_file is not None:
 else:
     sample_path = "data/sample_engine.csv"
     if not os.path.exists(sample_path):
-        st.warning("⚠️ No uploaded data or sample data found. Switching to Demo Mode.")
+        st.warning("⚠️ No uploaded data or sample data found. Switching to demo mode.")
         # Demo Mode: generate synthetic data
         df = pd.DataFrame({
             "cycle": np.arange(1, 51),
@@ -129,6 +142,7 @@ for i in range(0, len(df), steps):
             fig.update_layout(margin=dict(l=40, r=40, t=40, b=40))
             col1.plotly_chart(fig, use_container_width=True)
         else:
+            import matplotlib.pyplot as plt
             fig, ax = plt.subplots()
             for col in feature_cols[:3]:
                 ax.plot(batch["cycle"], batch[col], label=col)
